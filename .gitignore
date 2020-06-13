@@ -102,3 +102,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+bak.old/QE3.py
+bak.old/QE1.py
+bak.old/QE2.py
