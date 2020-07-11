@@ -10,6 +10,16 @@ print(sys.path)
 print(mod.s)
 print("primeraprueba")
 
+import sys
+print(sys.path)
+
+
+import mod
+print(mod.__file__)
+
+import re
+print(re.__file__)
+
 # purpose:     Construcción de menús, barras de herramientas
 #              y de estado 
 #------------------------------------------------------------
@@ -27,6 +37,10 @@ https://python-para-impacientes.blogspot.com/2016/03/menus-barras-de-herramienta
 https://python-para-impacientes.blogspot.com/
 https://wiki.python.org/moin/TkInter
 https://www.flaticon.com/
+
+Sobre módulos y paquetes
+http://research.iac.es/sieinvens/python-course/source/modulos.html
+
 """
 
 import os, sys, webbrowser, platform

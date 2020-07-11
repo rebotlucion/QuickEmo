@@ -1,0 +1,9 @@
+#  ## contenido de un posible MAINFEST.in
+# include LICENSE
+# include *.txt *.in
+# include *.py
+# recursive-include tostadas_pipo *
+# global-exclude *.pyc *.pyo *~
+# prune build
+# prune dist
+# README.txt: es el archivo donde se define la documentación general del paquete, este archivo es importante debido a que no solo es usado localmente en un copia descargada, sino como información usada el en sitio de PyPI. Entonces abra el archivo README.txt e ingrese el siguiente contenido. Usted puede personalizarlo como quiera:
