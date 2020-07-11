@@ -1,3 +1,9 @@
+# https://j2logo.com/gitignore-para-que-sirve/
+# Podemos editar el fichero .gitignore según nuestras necesidades, configuración del sistema o requisitos del 
+# proyecto. Aquí te dejo un ejemplo de partida de un fichero .gitignore válido para cualquier tipo de proyecto 
+# Python. Eres libre de añadir y/o quitar lo que quieras/necesites.
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

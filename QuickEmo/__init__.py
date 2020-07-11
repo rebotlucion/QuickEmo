@@ -14,15 +14,16 @@ y luego puede haber otros módulos e incluso otros paquetes.
 """
 
 
-print(f'Invoking __init__.py for {__name__}')
-A = ['quux', 'corge', 'grault']
+#print(f'Invoking __init__.py for {__name__}')
+#A = ['quux', 'corge', 'grault']
 
 
 
 
 # El fichero __init__.py puede y suele estar vacío, 
 # aunque se puede usar para importar modulos comunes entre paquetes.
-import pkg.mod1, pkg.mod2
+
+##import pkg.mod1, pkg.mod2
 
 
 """

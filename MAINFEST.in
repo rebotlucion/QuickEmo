@@ -7,3 +7,32 @@
 # prune build
 # prune dist
 # README.txt: es el archivo donde se define la documentación general del paquete, este archivo es importante debido a que no solo es usado localmente en un copia descargada, sino como información usada el en sitio de PyPI. Entonces abra el archivo README.txt e ingrese el siguiente contenido. Usted puede personalizarlo como quiera:
+
+"""
+https://stackoverrun.com/es/q/6778224
+Re: "Do I need a MANIFEST.in?
+No, you do not have to use MANIFEST.in. Both, distutils and setuptools are including in source distribution package all the files mentioned in setup.py - modules, package python files, README.txt and test/test*.py. If this is all you want to have in distribution package, you do not have to use MANIFEST.in.
+
+If you want to manipulate (add or remove) default files to include, you have to use MANIFEST.in.
+
+Re: What should be in it?
+The procedure is simple:
+
+Make sure, in your setup.py you include (by means of setup arguments) all the files you feel important for the program to run (modules, packages, scripts ...)
+
+Clarify, if there are some files to add or some files to exclude. If neither is needed, then there is no need for using MANIFEST.in.
+
+If MANIFEST.in is needed, create it. Usually, you add there tests*/*.py files, README.rst if you do not use README.txt, docs files and possibly some data files for test suite, if necessary.
+
+For example:
+
+include README.rst
+include COPYING.txt
+To test it, run python setup.py sdist, and examine the tarball created under dist/.
+
+When will all these different package systems ...
+Comparing the situation today and 2 years ago - the situation is much much better - setuptools is the way to go. You can ignore the fact, distutils is a bit broken and is low level base for setuptools as setuptools shall take care of hiding these things from you.
+
+EDIT: Last few projects I use pbr for building distribution packages with three line setup.py and rest being in setup.cfg and requirements.txt. No need to care about MANIFEST.in and other strange stuff. Even though the package would deserve a bit more documentation. See http://docs.openstack.org/developer/pbr/
+
+"""
