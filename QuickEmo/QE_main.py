@@ -1,624 +1,510 @@
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
+
 """
 Created on Sat Jul 11 20:13:42 2020
 
 @author: fco_p
 """
 
-from __future__ import print_function
-import argparse
+
+### General imports ###
+from __future__ import division
+import numpy as np
+import pandas as pd
+import time
+import re
 import os
-import numpy
-import glob
-import matplotlib.pyplot as plt
-from pyAudioAnalysis import audioFeatureExtraction as aF
-from pyAudioAnalysis import audioTrainTest as aT
-from pyAudioAnalysis import audioSegmentation as aS
-from pyAudioAnalysis import audioVisualization as aV
-from pyAudioAnalysis import audioBasicIO
-import scipy.io.wavfile as wavfile
-import matplotlib.patches
+from collections import Counter
+import altair as alt
+
+"""
+### Flask imports
+import requests
+from flask import Flask, render_template, session, request, redirect, flash, Response
+"""
+
+### Audio imports ###
+from library.speech_emotion_recognition import *
+
+### Video imports ###
+from library.video_emotion_recognition import *
+
+### Text imports ###
+from library.text_emotion_recognition import *
+from library.text_preprocessor import *
+from nltk import *
+from tika import parser
+from werkzeug.utils import secure_filename
+import tempfile
+
+
+"""
+# Flask config
+app = Flask(__name__)
+app.secret_key = b'(\xee\x00\xd4\xce"\xcf\xe8@\r\xde\xfc\xbdJ\x08W'
+app.config['UPLOAD_FOLDER'] = '/Upload'
+
+################################################################################
+################################## INDEX #######################################
+################################################################################
+
+# Home page
+@app.route('/', methods=['GET'])
+def index():
+    return render_template('index.html')
+
+################################################################################
+################################## RULES #######################################
+################################################################################
+
+# Rules of the game
+@app.route('/rules')
+def rules():
+    return render_template('rules.html')
+"""
+################################################################################
+############################### VIDEO INTERVIEW ################################
+################################################################################
+
+
+# Read the overall dataframe before the user starts to add his own data
+df = pd.read_csv('static/js/db/histo.txt', sep=",")
+
+
+"""
+# Video interview template
+@app.route('/video', methods=['POST'])
+def video() :
+    # Display a warning message
+    flash('You will have 45 seconds to discuss the topic mentioned above. Due to restrictions, we are not able to redirect you once the video is over. Please move your URL to /video_dash instead of /video_1 once over. You will be able to see your results then.')
+    return render_template('video.html')
+
+# Display the video flow (face, landmarks, emotion)
+@app.route('/video_1', methods=['POST'])
+def video_1() :
+    try :
+        # Response is used to display a flow of information
+        return Response(gen(),mimetype='multipart/x-mixed-replace; boundary=frame')
+    #return Response(stream_template('video.html', gen()))
+    except :
+        return None
+"""
+
+"""
+# Dashboard
+@app.route('/video_dash', methods=("POST", "GET"))
+def video_dash():
+    
+    # Load personal history
+    df_2 = pd.read_csv('static/js/db/histo_perso.txt')
+
+
+    def emo_prop(df_2) :
+        return [int(100*len(df_2[df_2.density==0])/len(df_2)),
+                    int(100*len(df_2[df_2.density==1])/len(df_2)),
+                    int(100*len(df_2[df_2.density==2])/len(df_2)),
+                    int(100*len(df_2[df_2.density==3])/len(df_2)),
+                    int(100*len(df_2[df_2.density==4])/len(df_2)),
+                    int(100*len(df_2[df_2.density==5])/len(df_2)),
+                    int(100*len(df_2[df_2.density==6])/len(df_2))]
+
+    emotions = ["Angry", "Disgust", "Fear",  "Happy", "Sad", "Surprise", "Neutral"]
+    emo_perso = {}
+    emo_glob = {}
+
+    for i in range(len(emotions)) :
+        emo_perso[emotions[i]] = len(df_2[df_2.density==i])
+        emo_glob[emotions[i]] = len(df[df.density==i])
 
+    df_perso = pd.DataFrame.from_dict(emo_perso, orient='index')
+    df_perso = df_perso.reset_index()
+    df_perso.columns = ['EMOTION', 'VALUE']
+    df_perso.to_csv('static/js/db/hist_vid_perso.txt', sep=",", index=False)
 
-def dirMp3toWavWrapper(directory, samplerate, channels):
-    if not os.path.isdir(directory):
-        raise Exception("Input path not found!")
+    df_glob = pd.DataFrame.from_dict(emo_glob, orient='index')
+    df_glob = df_glob.reset_index()
+    df_glob.columns = ['EMOTION', 'VALUE']
+    df_glob.to_csv('static/js/db/hist_vid_glob.txt', sep=",", index=False)
 
-    useMp3TagsAsNames = True
-    audioBasicIO.convertDirMP3ToWav(directory, samplerate, channels,
-                                    useMp3TagsAsNames)
+    emotion = df_2.density.mode()[0]
+    emotion_other = df.density.mode()[0]
 
+    def emotion_label(emotion) :
+        if emotion == 0 :
+            return "Angry"
+        elif emotion == 1 :
+            return "Disgust"
+        elif emotion == 2 :
+            return "Fear"
+        elif emotion == 3 :
+            return "Happy"
+        elif emotion == 4 :
+            return "Sad"
+        elif emotion == 5 :
+            return "Surprise"
+        else :
+            return "Neutral"
 
-def dirWAVChangeFs(directory, samplerate, channels):
-    if not os.path.isdir(directory):
-        raise Exception("Input path not found!")
+    ### Altair Plot
+    df_altair = pd.read_csv('static/js/db/prob.csv', header=None, index_col=None).reset_index()
+    df_altair.columns = ['Time', 'Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 
-    audioBasicIO.convertFsDirWavToWav(directory, samplerate, channels)
-
-
-def featureExtractionFileWrapper(wav_file, out_file, mt_win, mt_step,
-                                 st_win, st_step):
-    if not os.path.isfile(wav_file):
-        raise Exception("Input audio file not found!")
-
-    aF.mtFeatureExtractionToFile(wav_file, mt_win, mt_step, st_win,
-                                 st_step, out_file, True, True, True)
-
-
-def beatExtractionWrapper(wav_file, plot):
-    if not os.path.isfile(wav_file):
-        raise Exception("Input audio file not found!")
-    [fs, x] = audioBasicIO.readAudioFile(wav_file)
-    F, _ = aF.stFeatureExtraction(x, fs, 0.050 * fs, 0.050 * fs)
-    bpm, ratio = aF.beatExtraction(F, 0.050, plot)
-    print("Beat: {0:d} bpm ".format(int(bpm)))
-    print("Ratio: {0:.2f} ".format(ratio))
-
-
-def featureExtractionDirWrapper(directory, mt_win, mt_step, st_win, st_step):
-    if not os.path.isdir(directory):
-        raise Exception("Input path not found!")
-    aF.mtFeatureExtractionToFileDir(directory, mt_win, mt_step, st_win,
-                                    st_step, True, True, True)
-
-
-def featureVisualizationDirWrapper(directory):
-    if not os.path.isdir(directory):
-        raise Exception("Input folder not found!")
-    aV.visualizeFeaturesFolder(directory, "pca", "")
-    #aV.visualizeFeaturesFolder(directory, "lda", "artist")
-
-
-def fileSpectrogramWrapper(wav_file):
-    if not os.path.isfile(wav_file):
-        raise Exception("Input audio file not found!")
-    [fs, x] = audioBasicIO.readAudioFile(wav_file)
-    x = audioBasicIO.stereo2mono(x)
-    specgram, TimeAxis, FreqAxis = aF.stSpectogram(x, fs, round(fs * 0.040),
-                                                   round(fs * 0.040), True)
-
-
-def fileChromagramWrapper(wav_file):
-    if not os.path.isfile(wav_file):
-        raise Exception("Input audio file not found!")
-    [fs, x] = audioBasicIO.readAudioFile(wav_file)
-    x = audioBasicIO.stereo2mono(x)
-    specgram, TimeAxis, FreqAxis = aF.stChromagram(x, fs, round(fs * 0.040),
-                                                   round(fs * 0.040), True)
-
-
-def trainClassifierWrapper(method, beat_feats, directories, model_name):
-    if len(directories) < 2:
-        raise Exception("At least 2 directories are needed")
-    aT.featureAndTrain(directories, 1, 1, aT.shortTermWindow, aT.shortTermStep,
-                       method.lower(), model_name, compute_beat=beat_feats)
-
-
-def trainRegressionWrapper(method, beat_feats, dirName, model_name):
-    aT.featureAndTrainRegression(dirName, 1, 1, aT.shortTermWindow,
-                                 aT.shortTermStep, method.lower(), model_name,
-                                 compute_beat=beat_feats)
-
-
-def classifyFileWrapper(inputFile, model_type, model_name):
-    if not os.path.isfile(model_name):
-        raise Exception("Input model_name not found!")
-    if not os.path.isfile(inputFile):
-        raise Exception("Input audio file not found!")
-
-    [Result, P, classNames] = aT.fileClassification(inputFile, model_name,
-                                                    model_type)
-    print("{0:s}\t{1:s}".format("Class", "Probability"))
-    for i, c in enumerate(classNames):
-        print("{0:s}\t{1:.2f}".format(c, P[i]))
-    print("Winner class: " + classNames[int(Result)])
-
-
-def regressionFileWrapper(inputFile, model_type, model_name):
-    if not os.path.isfile(inputFile):
-        raise Exception("Input audio file not found!")
-
-    R, regressionNames = aT.fileRegression(inputFile, model_name, model_type)
-    for i in range(len(R)):
-        print("{0:s}\t{1:.3f}".format(regressionNames[i], R[i]))
-
-
-def classifyFolderWrapper(inputFolder, model_type, model_name,
-                          outputMode=False):
-    if not os.path.isfile(model_name):
-        raise Exception("Input model_name not found!")
-    types = ('*.wav', '*.aif',  '*.aiff', '*.mp3')
-    wavFilesList = []
-    for files in types:
-        wavFilesList.extend(glob.glob((inputFolder + files)))
-    wavFilesList = sorted(wavFilesList)
-    if len(wavFilesList) == 0:
-        print("No WAV files found!")
-        return
-    Results = []
-    for wavFile in wavFilesList:
-        [Result, P, classNames] = aT.fileClassification(wavFile, model_name,
-                                                        model_type)
-        Result = int(Result)
-        Results.append(Result)
-        if outputMode:
-            print("{0:s}\t{1:s}".format(wavFile, classNames[Result]))
-    Results = numpy.array(Results)
-
-    # print distribution of classes:
-    [Histogram, _] = numpy.histogram(Results,
-                                     bins=numpy.arange(len(classNames) + 1))
-    for i, h in enumerate(Histogram):
-        print("{0:20s}\t\t{1:d}".format(classNames[i], h))
-
-
-def regressionFolderWrapper(inputFolder, model_type, model_name):
-    files = "*.wav"
-    if os.path.isdir(inputFolder):
-        strFilePattern = os.path.join(inputFolder, files)
-    else:
-        strFilePattern = inputFolder + files
-
-    wavFilesList = []
-    wavFilesList.extend(glob.glob(strFilePattern))
-    wavFilesList = sorted(wavFilesList)
-    if len(wavFilesList) == 0:
-        print("No WAV files found!")
-        return
-    Results = []
-    for wavFile in wavFilesList:
-        R, regressionNames = aT.fileRegression(wavFile, model_name, model_type)
-        Results.append(R)
-    Results = numpy.array(Results)
-
-    for i, r in enumerate(regressionNames):
-        [Histogram, bins] = numpy.histogram(Results[:, i])
-        centers = (bins[0:-1] + bins[1::]) / 2.0
-        plt.subplot(len(regressionNames), 1, i + 1)
-        plt.plot(centers, Histogram)
-        plt.title(r)
-    plt.show()
-
-
-def trainHMMsegmenter_fromfile(wavFile, gtFile, hmmModelName, mt_win, mt_step):
-    if not os.path.isfile(wavFile):
-        print("Error: wavfile does not exist!")
-        return
-    if not os.path.isfile(gtFile):
-        print("Error: groundtruth does not exist!")
-        return
-
-    aS.trainHMM_fromFile(wavFile, gtFile, hmmModelName, mt_win, mt_step)
-
-
-def trainHMMsegmenter_fromdir(directory, hmmModelName, mt_win, mt_step):
-    if not os.path.isdir(directory):
-        raise Exception("Input folder not found!")
-    aS.trainHMM_fromDir(directory, hmmModelName, mt_win, mt_step)
-
-
-def segmentclassifyFileWrapper(inputWavFile, model_name, model_type):
-    if not os.path.isfile(model_name):
-        raise Exception("Input model_name not found!")
-    if not os.path.isfile(inputWavFile):
-        raise Exception("Input audio file not found!")
-    gtFile = ""
-    if inputWavFile[-4::]==".wav":
-        gtFile = inputWavFile.replace(".wav", ".segments")
-    if inputWavFile[-4::]==".mp3":
-        gtFile = inputWavFile.replace(".mp3", ".segments")
-    aS.mtFileClassification(inputWavFile, model_name, model_type, True, gtFile)
-
-
-def segmentclassifyFileWrapperHMM(wavFile, hmmModelName):
-    gtFile = wavFile.replace(".wav", ".segments")
-    aS.hmmSegmentation(wavFile, hmmModelName, plot_res=True,
-                       gt_file_name=gtFile)
-
-
-def segmentationEvaluation(dirName, model_name, methodName):
-    aS.evaluateSegmentationClassificationDir(dirName, model_name, methodName)
-
-
-def silenceRemovalWrapper(inputFile, smoothingWindow, weight):
-    if not os.path.isfile(inputFile):
-        raise Exception("Input audio file not found!")
-
-    [fs, x] = audioBasicIO.readAudioFile(inputFile)
-    segmentLimits = aS.silenceRemoval(x, fs, 0.05, 0.05,
-                                      smoothingWindow, weight, True)
-    for i, s in enumerate(segmentLimits):
-        strOut = "{0:s}_{1:.3f}-{2:.3f}.wav".format(inputFile[0:-4], s[0], s[1])
-        wavfile.write(strOut, fs, x[int(fs * s[0]):int(fs * s[1])])
-
-
-def speakerDiarizationWrapper(inputFile, numSpeakers, useLDA):
-    if useLDA:
-        aS.speakerDiarization(inputFile, numSpeakers, plot_res=True)
-    else:
-        aS.speakerDiarization(inputFile, numSpeakers, lda_dim=0, plot_res=True)
-
-
-def thumbnailWrapper(inputFile, thumbnailWrapperSize):
-    st_window = 0.5
-    st_step = 0.5
-    if not os.path.isfile(inputFile):
-        raise Exception("Input audio file not found!")
-
-    [fs, x] = audioBasicIO.readAudioFile(inputFile)
-    if fs == -1:    # could not read file
-        return
-
-    [A1, A2, B1, B2, Smatrix] = aS.musicThumbnailing(x, fs, st_window, st_step,
-                                                     thumbnailWrapperSize)
-
-    # write thumbnailWrappers to WAV files:
-    if inputFile.endswith(".wav"):
-        thumbnailWrapperFileName1 = inputFile.replace(".wav", "_thumb1.wav")
-        thumbnailWrapperFileName2 = inputFile.replace(".wav", "_thumb2.wav")
-    if inputFile.endswith(".mp3"):
-        thumbnailWrapperFileName1 = inputFile.replace(".mp3", "_thumb1.mp3")
-        thumbnailWrapperFileName2 = inputFile.replace(".mp3", "_thumb2.mp3")
-    wavfile.write(thumbnailWrapperFileName1, fs, x[int(fs * A1):int(fs * A2)])
-    wavfile.write(thumbnailWrapperFileName2, fs, x[int(fs * B1):int(fs * B2)])
-    print("1st thumbnailWrapper (stored in file {0:s}): {1:4.1f}sec" \
-          " -- {2:4.1f}sec".format(thumbnailWrapperFileName1, A1, A2))
-    print("2nd thumbnailWrapper (stored in file {0:s}): {1:4.1f}sec" \
-          " -- {2:4.1f}sec".format(thumbnailWrapperFileName2, B1, B2))
-
-    # Plot self-similarity matrix:
-    fig = plt.figure()
-    ax = fig.add_subplot(111, aspect="auto")
-    plt.imshow(Smatrix)
-    # Plot best-similarity diagonal:
-    Xcenter = (A1 / st_step + A2 / st_step) / 2.0
-    Ycenter = (B1 / st_step + B2 / st_step) / 2.0
-
-    e1 = matplotlib.patches.Ellipse((Ycenter, Xcenter),
-                                    thumbnailWrapperSize * 1.4, 3, angle=45,
-                                    linewidth=3, fill=False)
-    ax.add_patch(e1)
-
-    plt.plot([B1/ st_step, Smatrix.shape[0]], [A1/ st_step, A1/ st_step], color="k",
-             linestyle="--", linewidth=2)
-    plt.plot([B2/ st_step, Smatrix.shape[0]], [A2/ st_step, A2/ st_step], color="k",
-             linestyle="--", linewidth=2)
-    plt.plot([B1/ st_step, B1/ st_step], [A1/ st_step, Smatrix.shape[0]], color="k",
-             linestyle="--", linewidth=2)
-    plt.plot([B2/ st_step, B2/ st_step], [A2/ st_step, Smatrix.shape[0]], color="k",
-             linestyle="--", linewidth=2)
-
-    plt.xlim([0, Smatrix.shape[0]])
-    plt.ylim([Smatrix.shape[1], 0])
-
-    ax.yaxis.set_label_position("right")
-    ax.yaxis.tick_right()
-
-    plt.xlabel("frame no")
-    plt.ylabel("frame no")
-    plt.title("Self-similarity matrix")
-
-    plt.show()
-
-
-def parse_arguments():
-    parser = argparse.ArgumentParser(description="A demonstration script "
-                                                 "for pyAudioAnalysis library")
-    tasks = parser.add_subparsers(
-        title="subcommands", description="available tasks",
-        dest="task", metavar="")
-
-    dirMp3Wav = tasks.add_parser("dirMp3toWav",
-                                 help="Convert all .mp3 files in a directory "
-                                      "to .wav format")
-    dirMp3Wav.add_argument("-i", "--input", required=True, help="Input folder")
-    dirMp3Wav.add_argument("-r", "--rate", type=int,
-                           choices=[8000, 16000, 32000, 44100], required=True,
-                           help="Samplerate of generated WAV files")
-    dirMp3Wav.add_argument("-c", "--channels", type=int, choices=[1, 2],
-                           required=True,
-                           help="Audio channels of generated WAV files")
-
-    dirWavRes = tasks.add_parser("dirWavResample",
-                                 help="Change samplerate of .wav "
-                                      "files in a directory")
-    dirWavRes.add_argument("-i", "--input", required=True, help="Input folder")
-    dirWavRes.add_argument("-r", "--rate", type=int,
-                           choices=[8000, 16000, 32000, 44100], required=True,
-                           help="Samplerate of generated WAV files")
-    dirWavRes.add_argument("-c", "--channels", type=int, choices=[1, 2],
-                           required=True,
-                           help="Audio channels of generated WAV files")
-
-    featExt = tasks.add_parser("featureExtractionFile",
-                               help="Extract audio features from file")
-    featExt.add_argument("-i", "--input", required=True,
-                         help="Input audio file")
-    featExt.add_argument("-o", "--output", required=True,
-                         help="Output file")
-    featExt.add_argument("-mw", "--mtwin", type=float,
-                         required=True, help="Mid-term window size")
-    featExt.add_argument("-ms", "--mtstep", type=float,
-                         required=True, help="Mid-term window step")
-    featExt.add_argument("-sw", "--stwin", type=float,
-                         default=0.050, help="Short-term window size")
-    featExt.add_argument("-ss", "--ststep", type=float,
-                         default=0.050, help="Short-term window step")
-
-    beat = tasks.add_parser("beatExtraction",
-                            help="Compute beat features of an audio file")
-    beat.add_argument("-i", "--input", required=True, help="Input audio file")
-    beat.add_argument("--plot", action="store_true", help="Generate plot")
-
-    featExtDir = tasks.add_parser("featureExtractionDir",
-                                  help="Extract audio features "
-                                       "from files in a folder")
-    featExtDir.add_argument("-i", "--input", required=True,
-                            help="Input directory")
-    featExtDir.add_argument("-mw", "--mtwin", type=float, required=True,
-                            help="Mid-term window size")
-    featExtDir.add_argument("-ms", "--mtstep", type=float, required=True,
-                            help="Mid-term window step")
-    featExtDir.add_argument("-sw", "--stwin", type=float, default=0.050,
-                            help="Short-term window size")
-    featExtDir.add_argument("-ss", "--ststep", type=float, default=0.050,
-                            help="Short-term window step")
-
-    featVis = tasks.add_parser("featureVisualization")
-    featVis.add_argument("-i", "--input", required=True, help="Input directory")
-
-    spectro = tasks.add_parser("fileSpectrogram")
-    spectro.add_argument("-i", "--input", required=True,
-                         help="Input audio file")
-
-    chroma = tasks.add_parser("fileChromagram")
-    chroma.add_argument("-i", "--input", required=True, help="Input audio file")
-
-    trainClass = tasks.add_parser("trainClassifier",
-                                  help="Train an SVM or KNN classifier")
-    trainClass.add_argument("-i", "--input", nargs="+",
-                            required=True, help="Input directories")
-    trainClass.add_argument("--method",
-                            choices=["svm", "svm_rbf", "knn", "randomforest",
-                                     "gradientboosting","extratrees"],
-                            required=True, help="Classifier type")
-    trainClass.add_argument("--beat", action="store_true",
-                            help="Compute beat features")
-    trainClass.add_argument("-o", "--output", required=True,
-                            help="Generated classifier filename")
-
-    trainReg = tasks.add_parser("trainRegression")
-    trainReg.add_argument("-i", "--input", required=True,
-                          help="Input directory")
-    trainReg.add_argument("--method", choices=["svm", "randomforest","svm_rbf"],
-                          required=True, help="Classifier type")
-    trainReg.add_argument("--beat", action="store_true",
-                          help="Compute beat features")
-    trainReg.add_argument("-o", "--output", required=True,
-                          help="Generated classifier filename")
-
-    classFile = tasks.add_parser("classifyFile",
-                                 help="Classify a file using an "
-                                      "existing classifier")
-    classFile.add_argument("-i", "--input", required=True,
-                           help="Input audio file")
-    classFile.add_argument("--model", choices=["svm", "svm_rbf", "knn",
-                                               "randomforest",
-                                               "gradientboosting",
-                                               "extratrees"],
-                           required=True, help="Classifier type (svm or knn or"
-                                               " randomforest or "
-                                               "gradientboosting or "
-                                               "extratrees)")
-    classFile.add_argument("--classifier", required=True,
-                           help="Classifier to use (path)")
-
-    trainHMM = tasks.add_parser("trainHMMsegmenter_fromfile",
-                                help="Train an HMM from file + annotation data")
-    trainHMM.add_argument("-i", "--input", required=True,
-                          help="Input audio file")
-    trainHMM.add_argument("--ground", required=True,
-                          help="Ground truth path (segments CSV file)")
-    trainHMM.add_argument("-o", "--output", required=True,
-                          help="HMM model name (path)")
-    trainHMM.add_argument("-mw", "--mtwin", type=float, required=True,
-                          help="Mid-term window size")
-    trainHMM.add_argument("-ms", "--mtstep", type=float, required=True,
-                          help="Mid-term window step")
-
-    trainHMMDir = tasks.add_parser("trainHMMsegmenter_fromdir",
-                                   help="Train an HMM from file + annotation "
-                                        "data stored in a directory (batch)")
-    trainHMMDir.add_argument("-i", "--input", required=True,
-                             help="Input audio folder")
-    trainHMMDir.add_argument("-o", "--output", required=True,
-                             help="HMM model name (path)")
-    trainHMMDir.add_argument("-mw", "--mtwin", type=float, required=True,
-                             help="Mid-term window size")
-    trainHMMDir.add_argument("-ms", "--mtstep", type=float, required=True,
-                             help="Mid-term window step")
-
-    segmentClassifyFile = tasks.add_parser("segmentClassifyFile",
-                                           help="Segmentation - classification "
-                                                "of a WAV file given a trained "
-                                                "SVM or kNN")
-    segmentClassifyFile.add_argument("-i", "--input", required=True,
-                                     help="Input audio file")
-    segmentClassifyFile.add_argument("--model",
-                                     choices=["svm", "svm_rbf", "knn",
-                                              "randomforest","gradientboosting",
-                                              "extratrees"],
-                                     required=True, help="Model type")
-    segmentClassifyFile.add_argument("--modelName", required=True,
-                                     help="Model path")
-
-    segmentClassifyFileHMM = tasks.add_parser("segmentClassifyFileHMM",
-                                              help="Segmentation - "
-                                                   "classification of a WAV "
-                                                   "file given a trained HMM")
-    segmentClassifyFileHMM.add_argument("-i", "--input", required=True,
-                                        help="Input audio file")
-    segmentClassifyFileHMM.add_argument("--hmm", required=True,
-                                        help="HMM Model to use (path)")
-
-    segmentationEvaluation = tasks.add_parser("segmentationEvaluation", help=
-                                              "Segmentation - classification "
-                                              "evaluation for a list of WAV "
-                                              "files and CSV ground-truth "
-                                              "stored in a folder")
-    segmentationEvaluation.add_argument("-i", "--input", required=True,
-                                        help="Input audio folder")
-    segmentationEvaluation.add_argument("--model",
-                                        choices=["svm", "knn", "hmm"],
-                                        required=True, help="Model type")
-    segmentationEvaluation.add_argument("--modelName", required=True,
-                                        help="Model path")
-
-    regFile = tasks.add_parser("regressionFile")
-    regFile.add_argument("-i", "--input", required=True,
-                         help="Input audio file")
-    regFile.add_argument("--model", choices=["svm", "svm_rbf","randomforest"],
-                         required=True, help="Regression type")
-    regFile.add_argument("--regression", required=True,
-                         help="Regression model to use")
-
-    classFolder = tasks.add_parser("classifyFolder")
-    classFolder.add_argument("-i", "--input", required=True,
-                             help="Input folder")
-    classFolder.add_argument("--model", choices=["svm", "svm_rbf", "knn",
-                                                 "randomforest",
-                                                 "gradientboosting",
-                                                 "extratrees"],
-                             required=True, help="Classifier type")
-    classFolder.add_argument("--classifier", required=True,
-                             help="Classifier to use (filename)")
-    classFolder.add_argument("--details", action="store_true",
-                             help="Plot details (otherwise only "
-                                  "counts per class are shown)")
-
-    regFolder = tasks.add_parser("regressionFolder")
-    regFolder.add_argument("-i", "--input", required=True, help="Input folder")
-    regFolder.add_argument("--model", choices=["svm", "knn"],
-                           required=True, help="Classifier type")
-    regFolder.add_argument("--regression", required=True,
-                           help="Regression model to use")
-
-    silrem = tasks.add_parser("silenceRemoval",
-                              help="Remove silence segments from a recording")
-    silrem.add_argument("-i", "--input", required=True, help="input audio file")
-    silrem.add_argument("-s", "--smoothing", type=float, default=1.0,
-                        help="smoothing window size in seconds.")
-    silrem.add_argument("-w", "--weight", type=float, default=0.5,
-                        help="weight factor in (0, 1)")
-
-    spkrDir = tasks.add_parser("speakerDiarization")
-    spkrDir.add_argument("-i", "--input", required=True,
-                         help="Input audio file")
-    spkrDir.add_argument("-n", "--num", type=int, required=True,
-                         help="Number of speakers")
-    spkrDir.add_argument("--flsd", action="store_true",
-                         help="Enable FLsD method")
-
-    speakerDiarizationScriptEval = tasks.add_parser("speakerDiarizationScriptEval",
-                                                    help="Train an SVM or KNN "
-                                                         "classifier")
-    speakerDiarizationScriptEval.add_argument("-i", "--input", required=True,
-                                              help="Input directory")
-    speakerDiarizationScriptEval.add_argument("--LDAs", type=int, nargs="+",
-                                              required=True,
-                                              help="List FLsD params")
-
-    thumb = tasks.add_parser("thumbnail",
-                             help="Generate a thumbnailWrapper "
-                                  "for an audio file")
-    thumb.add_argument("-i", "--input", required=True, help="input audio file")
-    thumb.add_argument("-s", "--size",  default=10.0,  type=float,
-                       help="thumbnailWrapper size in seconds.")
-
-    return parser.parse_args()
-
-
-if __name__ == "__main__":
-    args = parse_arguments()
-
-
-    if args.task == "dirMp3toWav":
-        # Convert mp3 to wav (batch - folder)
-        dirMp3toWavWrapper(args.input, args.rate, args.channels)
-    elif args.task == "dirWavResample":
-        # Convert fs for a list of wavs stored in a folder
-        dirWAVChangeFs(args.input, args.rate, args.channels)
-    elif args.task == "featureExtractionFile":
-        # Feature extraction for WAV file
-        featureExtractionFileWrapper(args.input, args.output, args.mtwin,
-                                     args.mtstep, args.stwin, args.ststep)
-    elif args.task == "featureExtractionDir":
-        # Feature extraction for all WAV files stored in a folder
-        featureExtractionDirWrapper(args.input, args.mtwin, args.mtstep,
-                                    args.stwin, args.ststep)
-    elif args.task == "fileSpectrogram":
-        # Extract spectrogram from a WAV file
-        fileSpectrogramWrapper(args.input)
-    elif args.task == "fileChromagram":
-        # Extract chromagram from a WAV file
-        fileChromagramWrapper(args.input)
-    elif args.task == "featureVisualization":
-        # Visualize the content of a list of WAV files stored in a folder
-        featureVisualizationDirWrapper(args.input)
-    elif args.task == "beatExtraction":
-        # Extract bpm from file
-        beatExtractionWrapper(args.input, args.plot)
-    elif args.task == "trainClassifier":
-        # Train classifier from data (organized in folders)
-        trainClassifierWrapper(args.method, args.beat, args.input, args.output)
-    elif args.task == "trainRegression":
-        # Train a regression model from data (organized in
-        # a single folder, while ground-truth is provided in a CSV)
-        trainRegressionWrapper(args.method, args.beat, args.input, args.output)
-    elif args.task == "classifyFile":
-        # Apply audio classifier on audio file
-        classifyFileWrapper(args.input, args.model, args.classifier)
-    elif args.task == "trainHMMsegmenter_fromfile":
-        # Train an hmm segmenter-classifier from WAV file + annotation
-        trainHMMsegmenter_fromfile(args.input, args.ground, args.output,
-                                   args.mtwin, args.mtstep)
-    elif args.task == "trainHMMsegmenter_fromdir":
-        # Train an hmm segmenter-classifier from a list of
-        # WAVs and annotations stored in a folder
-        trainHMMsegmenter_fromdir(args.input, args.output, args.mtwin,
-                                  args.mtstep)
-    elif args.task == "segmentClassifyFile":
-        # Apply a classifier (svm or knn or randomforest or gradientboosting
-        # or extratrees) for segmentation-classificaiton to a WAV file
-        segmentclassifyFileWrapper(args.input, args.modelName, args.model)
-    elif args.task == "segmentClassifyFileHMM":
-        # Apply an hmm for segmentation-classificaiton to a WAV file
-        segmentclassifyFileWrapperHMM(args.input, args.hmm)
-    elif args.task == "segmentationEvaluation":
-        # Evaluate segmentation-classification for a list of WAV files
-        # (and ground truth CSVs) stored in a folder
-        segmentationEvaluation(args.input, args.modelName, args.model)
-    elif args.task == "regressionFile":
-        # Apply a regression model to an audio signal stored in a WAV file
-        regressionFileWrapper(args.input, args.model, args.regression)
-    elif args.task == "classifyFolder":
-        # Classify every WAV file in a given path
-        classifyFolderWrapper(args.input, args.model, args.classifier,
-                              args.details)
-    elif args.task == "regressionFolder":
-        # Apply a regression model on every WAV file in a given path
-        regressionFolderWrapper(args.input, args.model, args.regression)
-    elif args.task == "silenceRemoval":
-        # Detect non-silent segments in a WAV file and
-        # output to seperate WAV files
-        silenceRemovalWrapper(args.input, args.smoothing, args.weight)
-    elif args.task == "speakerDiarization":
-        # Perform speaker diarization on a WAV file
-        speakerDiarizationWrapper(args.input, args.num, args.flsd)
-    elif args.task == "speakerDiarizationScriptEval":
-        # Evaluate speaker diarization given a folder that contains
-        # WAV files and .segment (Groundtruth files)
-        aS.speakerDiarizationEvaluateScript(args.input, args.LDAs)
-    elif args.task == "thumbnail":
-        # Audio thumbnailing
-        thumbnailWrapper(args.input, args.size)
+    
+    angry = alt.Chart(df_altair).mark_line(color='orange', strokeWidth=2).encode(
+       x='Time:Q',
+       y='Angry:Q',
+       tooltip=["Angry"]
+    )
+
+    disgust = alt.Chart(df_altair).mark_line(color='red', strokeWidth=2).encode(
+        x='Time:Q',
+        y='Disgust:Q',
+        tooltip=["Disgust"])
+
+
+    fear = alt.Chart(df_altair).mark_line(color='green', strokeWidth=2).encode(
+        x='Time:Q',
+        y='Fear:Q',
+        tooltip=["Fear"])
+
+
+    happy = alt.Chart(df_altair).mark_line(color='blue', strokeWidth=2).encode(
+        x='Time:Q',
+        y='Happy:Q',
+        tooltip=["Happy"])
+
+
+    sad = alt.Chart(df_altair).mark_line(color='black', strokeWidth=2).encode(
+        x='Time:Q',
+        y='Sad:Q',
+        tooltip=["Sad"])
+
+
+    surprise = alt.Chart(df_altair).mark_line(color='pink', strokeWidth=2).encode(
+        x='Time:Q',
+        y='Surprise:Q',
+        tooltip=["Surprise"])
+
+
+    neutral = alt.Chart(df_altair).mark_line(color='brown', strokeWidth=2).encode(
+        x='Time:Q',
+        y='Neutral:Q',
+        tooltip=["Neutral"])
+
+
+    chart = (angry + disgust + fear + happy + sad + surprise + neutral).properties(
+    width=1000, height=400, title='Probability of each emotion over time')
+
+    chart.save('static/CSS/chart.html')
+    
+    return render_template('video_dash.html', emo=emotion_label(emotion), emo_other = emotion_label(emotion_other), prob = emo_prop(df_2), prob_other = emo_prop(df))
+
+"""
+
+
+################################################################################
+############################### AUDIO INTERVIEW ################################
+################################################################################
+
+
+"""
+# Audio Index
+@app.route('/audio_index', methods=['POST'])
+def audio_index():
+
+    # Flash message
+    flash("After pressing the button above, you will have 15sec to answer the question.")
+    
+    return render_template('audio.html', display_button=False)
+
+# Audio Recording
+@app.route('/audio_recording', methods=("POST", "GET"))
+"""
+def audio_recording():
+
+    # Instanciate new SpeechEmotionRecognition object
+    SER = speechEmotionRecognition()
+
+    # Voice Recording
+    rec_duration = 16 # in sec
+    rec_sub_dir = os.path.join('tmp','voice_recording.wav')
+    SER.voice_recording(rec_sub_dir, duration=rec_duration)
+
+"""
+    # Send Flash message
+    flash("The recording is over! You now have the opportunity to do an analysis of your emotions. 
+          If you wish, you can also choose to record yourself again.")
+
+    return render_template('audio.html', display_button=True)
+"""
+
+"""
+# Audio Emotion Analysis
+@app.route('/audio_dash', methods=("POST", "GET"))
+
+"""
+def audio_dash():
+
+    # Sub dir to speech emotion recognition model
+    model_sub_dir = os.path.join('Models', 'audio.hdf5')
+
+    # Instanciate new SpeechEmotionRecognition object
+    SER = speechEmotionRecognition(model_sub_dir)
+
+    # Voice Record sub dir
+    rec_sub_dir = os.path.join('tmp','voice_recording.wav')
+
+    # Predict emotion in voice at each time step
+    step = 1 # in sec
+    sample_rate = 16000 # in kHz
+    emotions, timestamp = SER.predict_emotion_from_file(rec_sub_dir, chunk_step=step*sample_rate)
+
+    # Export predicted emotions to .txt format
+    SER.prediction_to_csv(emotions, os.path.join("static/js/db", "audio_emotions.txt"), mode='w')
+    SER.prediction_to_csv(emotions, os.path.join("static/js/db", "audio_emotions_other.txt"), mode='a')
+
+    # Get most common emotion during the interview
+    major_emotion = max(set(emotions), key=emotions.count)
+
+    # Calculate emotion distribution
+    emotion_dist = [int(100 * emotions.count(emotion) / len(emotions)) for emotion in SER._emotion.values()]
+
+    # Export emotion distribution to .csv format for D3JS
+    df = pd.DataFrame(emotion_dist, index=SER._emotion.values(), columns=['VALUE']).rename_axis('EMOTION')
+    df.to_csv(os.path.join('static/js/db','audio_emotions_dist.txt'), sep=',')
+
+"""  yo no tengo otros candidatos, lo que tengo es una interlocucción de dos "entes"....
+    # Get most common emotion of other candidates
+    df_other = pd.read_csv(os.path.join("static/js/db", "audio_emotions_other.txt"), sep=",")
+
+    # Get most common emotion during the interview for other candidates
+    major_emotion_other = df_other.EMOTION.mode()[0]
+
+    # Calculate emotion distribution for other candidates
+    emotion_dist_other = [int(100 * len(df_other[df_other.EMOTION==emotion]) / len(df_other)) for emotion in SER._emotion.values()]
+
+    # Export emotion distribution to .csv format for D3JS
+    df_other = pd.DataFrame(emotion_dist_other, index=SER._emotion.values(), columns=['VALUE']).rename_axis('EMOTION')
+    df_other.to_csv(os.path.join('static/js/db','audio_emotions_dist_other.txt'), sep=',')
+"""
+    # Sleep
+    time.sleep(0.5)#  ¿yo lo necesito?
+
+"""
+    return render_template('audio_dash.html', emo=major_emotion, emo_other=major_emotion_other, prob=emotion_dist, prob_other=emotion_dist_other)
+"""
+
+################################################################################
+############################### TEXT INTERVIEW #################################
+################################################################################
+
+## En mi caso lo que necesito es sacar el texto del audio anterior
+
+global df_text
+
+tempdirectory = tempfile.gettempdir()
+
+@app.route('/text', methods=['POST'])
+def text() :
+    return render_template('text.html')
+
+# para entrevistas de trabajo puede estar bien, ¿puede servir a mi modelo que 
+#como parte de la predicción vayamos construyendo un modelo de personalidad 
+# según progresa la interacción
+def get_personality(text):
+    try:
+        pred = predict().run(text, model_name = "Personality_traits_NN")
+        return pred
+    except KeyError:
+        return None
+
+def get_text_info(text):
+    text = text[0]
+    words = wordpunct_tokenize(text)
+    common_words = FreqDist(words).most_common(100)
+    counts = Counter(words)
+    num_words = len(text.split())
+    return common_words, num_words, counts
+
+def preprocess_text(text):
+    preprocessed_texts = NLTKPreprocessor().transform([text])
+    return preprocessed_texts
+
+"""
+@app.route('/text_1', methods=['POST'])
+"""
+def text_1():
+    
+    text = request.form.get('text')
+    traits = ['Extraversion', 'Neuroticism', 'Agreeableness', 'Conscientiousness', 'Openness']
+        # estas etiquetas son distintas a voz, ¿debería de estar alineado o son complementarios?
+        # ¿fusionar o dar información complementaria y diferente
+    probas = get_personality(text)[0].tolist()
+    
+    df_text = pd.read_csv('static/js/db/text.txt', sep=",")
+    df_new = df_text.append(pd.DataFrame([probas], columns=traits))
+    df_new.to_csv('static/js/db/text.txt', sep=",", index=False)
+    
+    perso = {}
+    perso['Extraversion'] = probas[0]
+    perso['Neuroticism'] = probas[1]
+    perso['Agreeableness'] = probas[2]
+    perso['Conscientiousness'] = probas[3]
+    perso['Openness'] = probas[4]
+    
+    df_text_perso = pd.DataFrame.from_dict(perso, orient='index')
+    df_text_perso = df_text_perso.reset_index()
+    df_text_perso.columns = ['Trait', 'Value']
+    
+    df_text_perso.to_csv('static/js/db/text_perso.txt', sep=',', index=False)
+    
+    means = {}
+    means['Extraversion'] = np.mean(df_new['Extraversion'])
+    means['Neuroticism'] = np.mean(df_new['Neuroticism'])
+    means['Agreeableness'] = np.mean(df_new['Agreeableness'])
+    means['Conscientiousness'] = np.mean(df_new['Conscientiousness'])
+    means['Openness'] = np.mean(df_new['Openness'])
+    
+    probas_others = [np.mean(df_new['Extraversion']), np.mean(df_new['Neuroticism']), np.mean(df_new['Agreeableness']), np.mean(df_new['Conscientiousness']), np.mean(df_new['Openness'])]
+    probas_others = [int(e*100) for e in probas_others]
+    
+    df_mean = pd.DataFrame.from_dict(means, orient='index')
+    df_mean = df_mean.reset_index()
+    df_mean.columns = ['Trait', 'Value']
+    
+    df_mean.to_csv('static/js/db/text_mean.txt', sep=',', index=False)
+    trait_others = df_mean.loc[df_mean['Value'].idxmax()]['Trait']
+    
+    probas = [int(e*100) for e in probas]
+    
+    data_traits = zip(traits, probas)
+    
+    session['probas'] = probas
+    session['text_info'] = {}
+    session['text_info']["common_words"] = []
+    session['text_info']["num_words"] = []
+    
+    preprocessed_text = preprocess_text(text)
+    common_words, num_words, counts = get_text_info(preprocessed_text)
+    
+    session['text_info']["common_words"].append(common_words)
+    session['text_info']["num_words"].append(num_words)
+    
+    trait = traits[probas.index(max(probas))]
+    
+    with open("static/js/db/words_perso.txt", "w") as d:
+        d.write("WORDS,FREQ" + '\n')
+        for line in counts :
+            d.write(line + "," + str(counts[line]) + '\n')
+        d.close()
+    
+    with open("static/js/db/words_common.txt", "a") as d:
+        for line in counts :
+            d.write(line + "," + str(counts[line]) + '\n')
+        d.close()
+
+    df_words_co = pd.read_csv('static/js/db/words_common.txt', sep=',', error_bad_lines=False)
+    df_words_co.FREQ = df_words_co.FREQ.apply(pd.to_numeric)
+    df_words_co = df_words_co.groupby('WORDS').sum().reset_index()
+    df_words_co.to_csv('static/js/db/words_common.txt', sep=",", index=False)
+    common_words_others = df_words_co.sort_values(by=['FREQ'], ascending=False)['WORDS'][:15]
+
+    df_words_perso = pd.read_csv('static/js/db/words_perso.txt', sep=',', error_bad_lines=False)
+    common_words_perso = df_words_perso.sort_values(by=['FREQ'], ascending=False)['WORDS'][:15]
+
+    return render_template('text_dash.html', traits = probas, trait = trait, trait_others = trait_others, probas_others = probas_others, num_words = num_words, common_words = common_words_perso, common_words_others=common_words_others)
+
+ALLOWED_EXTENSIONS = set(['pdf'])
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+"""
+@app.route('/text_pdf', methods=['POST'])
+"""
+
+def text_pdf():
+    f = request.files['file']
+    f.save(secure_filename(f.filename))
+    
+    text = parser.from_file(f.filename)['content']
+    traits = ['Extraversion', 'Neuroticism', 'Agreeableness', 'Conscientiousness', 'Openness']
+    probas = get_personality(text)[0].tolist()
+    
+    df_text = pd.read_csv('static/js/db/text.txt', sep=",")
+    df_new = df_text.append(pd.DataFrame([probas], columns=traits))
+    df_new.to_csv('static/js/db/text.txt', sep=",", index=False)
+    
+    perso = {}
+    perso['Extraversion'] = probas[0]
+    perso['Neuroticism'] = probas[1]
+    perso['Agreeableness'] = probas[2]
+    perso['Conscientiousness'] = probas[3]
+    perso['Openness'] = probas[4]
+    
+    df_text_perso = pd.DataFrame.from_dict(perso, orient='index')
+    df_text_perso = df_text_perso.reset_index()
+    df_text_perso.columns = ['Trait', 'Value']
+    
+    df_text_perso.to_csv('static/js/db/text_perso.txt', sep=',', index=False)
+    
+    means = {}
+    means['Extraversion'] = np.mean(df_new['Extraversion'])
+    means['Neuroticism'] = np.mean(df_new['Neuroticism'])
+    means['Agreeableness'] = np.mean(df_new['Agreeableness'])
+    means['Conscientiousness'] = np.mean(df_new['Conscientiousness'])
+    means['Openness'] = np.mean(df_new['Openness'])
+    
+    probas_others = [np.mean(df_new['Extraversion']), np.mean(df_new['Neuroticism']), np.mean(df_new['Agreeableness']), np.mean(df_new['Conscientiousness']), np.mean(df_new['Openness'])]
+    probas_others = [int(e*100) for e in probas_others]
+    
+    df_mean = pd.DataFrame.from_dict(means, orient='index')
+    df_mean = df_mean.reset_index()
+    df_mean.columns = ['Trait', 'Value']
+    
+    df_mean.to_csv('static/js/db/text_mean.txt', sep=',', index=False)
+    trait_others = df_mean.ix[df_mean['Value'].idxmax()]['Trait']
+    
+    probas = [int(e*100) for e in probas]
+    
+    data_traits = zip(traits, probas)
+    
+    session['probas'] = probas
+    session['text_info'] = {}
+    session['text_info']["common_words"] = []
+    session['text_info']["num_words"] = []
+    
+    preprocessed_text = preprocess_text(text)
+    common_words, num_words, counts = get_text_info(preprocessed_text)
+    
+    session['text_info']["common_words"].append(common_words)
+    session['text_info']["num_words"].append(num_words)
+    
+    trait = traits[probas.index(max(probas))]
+    
+    with open("static/js/db/words_perso.txt", "w") as d:
+        d.write("WORDS,FREQ" + '\n')
+        for line in counts :
+            d.write(line + "," + str(counts[line]) + '\n')
+        d.close()
+    
+    with open("static/js/db/words_common.txt", "a") as d:
+        for line in counts :
+            d.write(line + "," + str(counts[line]) + '\n')
+        d.close()
+
+    df_words_co = pd.read_csv('static/js/db/words_common.txt', sep=',', error_bad_lines=False)
+    df_words_co.FREQ = df_words_co.FREQ.apply(pd.to_numeric)
+    df_words_co = df_words_co.groupby('WORDS').sum().reset_index()
+    df_words_co.to_csv('static/js/db/words_common.txt', sep=",", index=False)
+    common_words_others = df_words_co.sort_values(by=['FREQ'], ascending=False)['WORDS'][:15]
+
+    df_words_perso = pd.read_csv('static/js/db/words_perso.txt', sep=',', error_bad_lines=False)
+    common_words_perso = df_words_perso.sort_values(by=['FREQ'], ascending=False)['WORDS'][:15]
+
+    return render_template('text_dash.html', traits = probas, trait = trait, trait_others = trait_others, probas_others = probas_others, num_words = num_words, common_words = common_words_perso, common_words_others=common_words_others)
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
