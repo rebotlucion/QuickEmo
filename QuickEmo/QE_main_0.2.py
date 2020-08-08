@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+sss#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 """
@@ -31,6 +31,7 @@ El modelo habría que hacerlo así:
      - ¿ayuda o es contraproducente mezlar idiomas?¿y culturas?
 
 - Despues del primer entregable completo, si puedo, sofisticar esta primera versión, con otras librerias y otras funcionalidades
+- ¿se podría identificar la personalidad de uno de los interlocutores? esto es muy subjetivo e improbable supongo
 
 
 hacer pruebas y validaciones con personaas
@@ -197,17 +198,6 @@ def get_personality(text):
     except KeyError:
         return None
 
-def get_text_info(text):
-    text = text[0]
-    words = wordpunct_tokenize(text)
-    common_words = FreqDist(words).most_common(100)
-    counts = Counter(words)
-    num_words = len(text.split())
-    return common_words, num_words, counts
-
-def preprocess_text(text):
-    preprocessed_texts = NLTKPreprocessor().transform([text])
-    return preprocessed_texts
 
 
 def text_1():
@@ -377,6 +367,7 @@ def text_pdf():
     common_words_perso = df_words_perso.sort_values(by=['FREQ'], ascending=False)['WORDS'][:15]
 
     return render_template('text_dash.html', traits = probas, trait = trait, trait_others = trait_others, probas_others = probas_others, num_words = num_words, common_words = common_words_perso, common_words_others=common_words_others)
+
 """
 Cuando tenga el GUI hecho, el control del flujo de la herramienta se llevará desde el GUI, por lo que habrá que lanzar el gui aquí
 
@@ -419,6 +410,7 @@ with escuchador.open() as esc:
                 # Se mostrará en la forma en que se decida, por GUI o como sea...
 
         if evento_final == true
+        
         d.close()
    
  ####################################################################################

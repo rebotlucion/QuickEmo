@@ -1,3 +1,0 @@
-No se de donde ha salido el contenido de .gitnore. Antes de terminar el TFM tengo que revisar el fichero y adaptarlo a mi proyecto
-
-estudiar que tipo de licencia utilizop, apache, gnu, etc, revisar la doc del TFM no vaya a meter la pata

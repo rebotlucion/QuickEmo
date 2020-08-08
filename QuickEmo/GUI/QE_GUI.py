@@ -5,19 +5,6 @@ Created on Thu Aug 15 13:30:56 2019
 @author: Paco
 """
 
-import sys
-print(sys.path)
-print("primeraprueba")
-
-import sys
-print(sys.path)
-
-
-
-
-import re
-print(re.__file__)
-
 # purpose:     Construcción de menús, barras de herramientas
 #              y de estado 
 #------------------------------------------------------------
@@ -32,7 +19,6 @@ print(re.__file__)
 """
 https://python-para-impacientes.blogspot.com/p/tutorial-de-tkinter.html
 https://python-para-impacientes.blogspot.com/2016/03/menus-barras-de-herramientas-y-de.html
-https://python-para-impacientes.blogspot.com/
 https://wiki.python.org/moin/TkInter
 https://www.flaticon.com/
 
@@ -41,7 +27,7 @@ http://research.iac.es/sieinvens/python-course/source/modulos.html
 
 """
 
-import os, sys, webbrowser, platform
+import os, webbrowser, platform
 from tkinter import *
 from tkinter import ttk, font, messagebox
 
@@ -73,7 +59,7 @@ class QuickEmoGUI():
         self.ventanaPrincipal.iconphoto(self.ventanaPrincipal, self.icono1)  # Asigna icono app 
         self.ventanaPrincipal.option_add("*Font", "Helvetica 12")  # Fuente predeterminada        
         self.ventanaPrincipal.option_add('*tearOff', False)  # Deshabilita submenús flotantes
-      #  self.ventanaPrincipal.attributes('-fullscreen', True)  # Maximiza ventana completa        
+        self.ventanaPrincipal.attributes('-fullscreen', True)  # Maximiza ventana completa        
         self.ventanaPrincipal.minsize(400,300)  # Establece tamaño minimo ventana
         
         # ESTABLECER ESTILO FUENTE PARA ALGUNOS WIDGETS:

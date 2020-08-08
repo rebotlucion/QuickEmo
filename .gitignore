@@ -3,6 +3,8 @@
 # proyecto. Aquí te dejo un ejemplo de partida de un fichero .gitignore válido para cualquier tipo de proyecto 
 # Python. Eres libre de añadir y/o quitar lo que quieras/necesites.
 
+# Textos y otros auxiliares al TFM que no forma parte del TFM
+NoGIT
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
