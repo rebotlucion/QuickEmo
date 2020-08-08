@@ -9,8 +9,8 @@ Created on Sat Jul 11 20:13:42 2020
 
 """
 
-El programa "PREDICTOR", debería de tener lo siguiente:
 
+El programa "PREDICTOR", debería de tener lo siguiente:
 - Separador de canales. Identificar a cada uno de los interlocutores
 - Establecer el género de los intelocutores
 - Establecer intervalo de edad de los interlocutores
@@ -22,7 +22,6 @@ El programa "PREDICTOR", debería de tener lo siguiente:
 
 
 El modelo habría que hacerlo así:
-
 - Hacer una primera versión, muy simple, con cualquier libreria
 - Entrenar el modelo con una sola fuente
 - A ser posible, consolidar diferentes fuentes y entrenar con todas (sería lo último después de tener un primer entregable)
@@ -391,7 +390,6 @@ emociones = [] # lista ordenada de emociones asociadas a cada interlocutor en ca
 palabras = [] # palabras pronunciandose de cada interlocutor o corte de audio de palabra incompleta (aún no identificada) por interlocutor
 mensajes = [] # lista de mensajes de cada uno de los interlocutores
                 # un mensaje es una lista ordenada de pares (texto palabra, audio palabra)
-
 
 with escuchador.open() as esc:
     for corte in esc.sonido_in :
