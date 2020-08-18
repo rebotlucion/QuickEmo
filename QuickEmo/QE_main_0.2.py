@@ -65,7 +65,7 @@ from tika import parser
 from werkzeug.utils import secure_filename
 import tempfile
 
-
+"""
     def emotion_label(emotion) :
         if emotion == 0 :
             return "Angry"
@@ -366,6 +366,7 @@ def text_pdf():
     common_words_perso = df_words_perso.sort_values(by=['FREQ'], ascending=False)['WORDS'][:15]
 
     return render_template('text_dash.html', traits = probas, trait = trait, trait_others = trait_others, probas_others = probas_others, num_words = num_words, common_words = common_words_perso, common_words_others=common_words_others)
+"""
 
 """
 Cuando tenga el GUI hecho, el control del flujo de la herramienta se llevará desde el GUI, por lo que habrá que lanzar el gui aquí
@@ -379,42 +380,107 @@ if __name__ == "__main__":
     print("Vamos a ello")
 
 
-import modeloVozTexto
-
-escucahdor = orejas.crear() # pendiente de resolver. Abrir un "escuchador" que va registrando el audio y generando "chunks" de audio que vamos procesando poco a poco en tiempo real según suceden
-modeloVT = modeloVozTexto.crear() # carga el modelo que tenemos entrenado. Es un volcado de los parámetros del modelo que hemos conseguido entrenar, tiene tanto la parte de speech como la de text
-
+#### INICIALIZAR CLASES ESPECÍFICAS DE LA APLICACIÓN
+import modeloVozTexto # Es un paquete para almacenar un volcado de los parámetros del modelo que hemos conseguido entrenar, tiene tanto la parte de speech como la de text
+escucahdor = orejas.crear() # pendiente de resolver. Abrir un "escuchador" que va registrando el audio y generando "chunks" de audio que
+    # vamos procesando poco a poco en tiempo real según suceden
+modeloVT = modeloVozTexto.crear() # carga el modelo que tenemos entrenado. 
+    #Es un volcado de los parámetros del modelo que hemos conseguido entrenar, tiene tanto la parte de speech como la de text
 interlocutores = [] # lista de identificadores de interlocutores, que son ternas (id_interlocutor, género interlocutor, rango edad interlocutor)
 emociones = [] # lista ordenada de emociones asociadas a cada interlocutor en cada momento de la conversación, ternas (emoción, probabilidad, tiempo o id_palabra donde sucede)
-                # la emoción más reciente de cada interlocutor, la que está sucendiendo en el momento de hablar, está en un extremo de la lista (¿principio? ¿más antiguos hacia el final?)
+               # la emoción más reciente de cada interlocutor, la que está sucendiendo en el momento de hablar, está en un extremo de la lista (¿principio? 
+               # ¿más antiguos hacia el final?)
 palabras = [] # palabras pronunciandose de cada interlocutor o corte de audio de palabra incompleta (aún no identificada) por interlocutor
 mensajes = [] # lista de mensajes de cada uno de los interlocutores
                 # un mensaje es una lista ordenada de pares (texto palabra, audio palabra)
 
-with escuchador.open() as esc:
-    for corte in esc.sonido_in :
-        actuales = audioX.diarization(corte) # separa los interlocutores, devuelve una lista de audios separadas por cada interlocutor, en forma
-                # de  duplass (    audio,    interlocutor(id_interlocutor, género interlocutor, rango edad interlocutor)      )
-        interlocutores = audioX.incorporar(actuales) #
-        palabras, mensajes, flag_nuevo = audioX.pegar(palabras, actuales) # incorpora audios en "actuales" por cada interlocutor a las palabras incompletas, intenta reconocerlas, 
-                # y si lo consigue, añade a "mensajes" las nuevas palabras en cada interlocutor y devuelve flag_nuevo=true, y además elimina de "palabras" los segmentos de audio que han sido identificados
-        if flag_nuevo
-            modeloVT.evaluar_emociones(mensajes) # intenta reconocer la emoción que hay en el par (texto palabra, audio palabra) nuevo que hay en los diferentes mensajes,  con una probabilidad. 
-                # Tambíen revisa las palabras anteriores con las nuevas, en cada mensaje, para ver si puede modificar la emoción anterior con una mejor probabilidad gracias a la nueva palabra
-                # ¿evaluar palabra a palabra? ¿en pares, ternas....?
-        
-        visualizarEmociones(mensajes) # visualiza, por una parte la emoción actual de cada interlocutor con la probabilidad o certidumbre del modelo y
-                # por otra parte la secuendia de emociones, con sus probabilidades, por las que ha ido pasando de más nueva a más antigua.
-                # Se mostrará en la forma en que se decida, por GUI o como sea...
 
-        if evento_final == true
+# INICIALIZAR "ESCUCHADOR" DE AUDIO
+
+import pyaudio
+import numpy as np
+ #import wave  ¿?
+CHUNK = 4096 # number of data points to read at a time, 4096 SAMPLES
+RATE = 44100 # time resolution of the recording device (Hz), RECOR AT 44100 SAMPLES PER SECOND
+p=pyaudio.PyAudio() # start the PyAudio class
+
+print('Recording')
+
+stream=p.open(format=pyaudio.paInt16,channels=1,rate=RATE,input=True,
+              frames_per_buffer=CHUNK) #uses default input device
+
+frames = []  # array to almacenar frames
+
+#import timeit
+
+"""
+for corte in esc.sonido_in :  lo que yo me había imaginado 
+"""
+
+
+#
+while 1 :
+    data = stream.read(chunk)
+    frames.append(data)  # carga un chunk en el frame
+
+# create a numpy array holding a single read of audio data
+#    data = np.fromstring(stream.read(CHUNK),dtype=np.int16)
+#    print(data)
+
+    actuales = audioX.diarization(corte) # separa los interlocutores, devuelve una lista de audios separadas por cada interlocutor, en forma
+            # de  duplass (    audio,    interlocutor(id_interlocutor, género interlocutor, rango edad interlocutor)      )
+    interlocutores = audioX.incorporar(actuales) #
+    palabras, mensajes, flag_nuevo = audioX.pegar(palabras, actuales) # incorpora audios en "actuales" por cada interlocutor a las palabras incompletas, intenta reconocerlas, 
+            # y si lo consigue, añade a "mensajes" las nuevas palabras en cada interlocutor y devuelve flag_nuevo=true, y además elimina de "palabras" los segmentos de audio que han sido identificados
+    if flag_nuevo:
+        modeloVT.evaluar_emociones(mensajes) # intenta reconocer la emoción que hay en el par (texto palabra, audio palabra) nuevo que hay en los diferentes mensajes,  con una probabilidad. 
+            # Tambíen revisa las palabras anteriores con las nuevas, en cada mensaje, para ver si puede modificar la emoción anterior con una mejor probabilidad gracias a la nueva palabra
+            # ¿evaluar palabra a palabra? ¿en pares, ternas....?
+    
+    visualizarEmociones(mensajes) # visualiza, por una parte la emoción actual de cada interlocutor con la probabilidad o certidumbre del modelo y
+            # por otra parte la secuendia de emociones, con sus probabilidades, por las que ha ido pasando de más nueva a más antigua.
+            # Se mostrará en la forma en que se decida, por GUI o como sea...
+
+    if evento_final == true:
         
         d.close()
    
+
+timeit.timeit(while_loop) #no tiene mucho sentido medir la duración del bucle dado que será el tiempo real que tengo la aplicación activa. Lo que habría que medir es el tiempo que tarda el bucle en dar el salto atrás
+
+# close the stream gracefully
+stream.stop_stream()
+stream.close()
+p.terminate()
+
+print('Finished recording')
+
+# Save the recorded data as a WAV file
+wf = wave.open(filename, 'wb')
+wf.setnchannels(channels)
+wf.setsampwidth(p.get_sample_size(sample_format))
+wf.setframerate(fs)
+wf.writeframes(b''.join(frames))
+wf.close()
+
+
+
  ####################################################################################
  #                                                                                  # 
  #   ¿  Y   QUE     PROBLEMA    RESUELVE    ESTO    ?                               #
  #   vender la moto bien bien                                                       #
  #                                                                                  # 
  ####################################################################################
-    
+
+"""
+from goto import with_goto
+@with_goto  # Decorador necesario.
+def f():
+    label .get_input  # Definir porción del código.
+    age = raw_input("Edad: ")
+    try:
+        age = int(age)
+    except ValueError:
+        goto .get_input  # Regresar a get_input.
+f()
+"""

@@ -6,11 +6,26 @@ Created on Sat Jul 11 20:13:42 2020
 
 @author: fco_p
 """
-
 """
+Using
 
+https://github.com/tyiannak/pyAudioAnalysis
+
+@article{giannakopoulos2015pyaudioanalysis,
+  title={pyAudioAnalysis: An Open-Source Python Library for Audio Signal Analysis},
+  author={Giannakopoulos, Theodoros},
+  journal={PloS one},
+  volume={10},
+  number={12},
+  year={2015},
+  publisher={Public Library of Science}
+}
+
+
+In this case, is exactly the same burt avoding working with files and passing as arguments directly arrays
+"""
+"""
 El programa "PREDICTOR", debería de tener lo siguiente:
-
 - Separador de canales. Identificar a cada uno de los interlocutores
 - Establecer el género de los intelocutores
 - Establecer intervalo de edad de los interlocutores
@@ -22,7 +37,6 @@ El programa "PREDICTOR", debería de tener lo siguiente:
 
 
 El modelo habría que hacerlo así:
-
 - Hacer una primera versión, muy simple, con cualquier libreria
 - Entrenar el modelo con una sola fuente
 - A ser posible, consolidar diferentes fuentes y entrenar con todas (sería lo último después de tener un primer entregable)
@@ -31,6 +45,7 @@ El modelo habría que hacerlo así:
      - ¿ayuda o es contraproducente mezlar idiomas?¿y culturas?
 
 - Despues del primer entregable completo, si puedo, sofisticar esta primera versión, con otras librerias y otras funcionalidades
+- ¿se podría identificar la personalidad de uno de los interlocutores? esto es muy subjetivo e improbable supongo
 
 
 hacer pruebas y validaciones con personaas
@@ -45,338 +60,29 @@ PROBLEMAS A RESOLVER
 """
 
 ### General imports ###
-from __future__ import division
+#from __future__ import division
 import numpy as np
-import pandas as pd
-import time
-import re
+#import pandas as pd
+#import time
+#import re
 import os
-from collections import Counter
-import altair as alt
+from __future__ import print_function
+#import timeit
+
+#from collections import Counter
+
 
 ### Audio imports ###
-from library.speech_emotion_recognition import *
+#from library.speech_emotion_recognition import *
 
 ### Text imports ###
-from library.text_emotion_recognition import *
-from library.text_preprocessor import *
-from nltk import *
-from tika import parser
-from werkzeug.utils import secure_filename
-import tempfile
+#from library.text_emotion_recognition import *
+#from library.text_preprocessor import *
+#from nltk import *
+#from tika import parser
+#from werkzeug.utils import secure_filename
+#import tempfile
 
-
-    def emotion_label(emotion) :
-        if emotion == 0 :
-            return "Angry"
-        elif emotion == 1 :
-            return "Disgust"
-        elif emotion == 2 :
-            return "Fear"
-        elif emotion == 3 :
-            return "Happy"
-        elif emotion == 4 :
-            return "Sad"
-        elif emotion == 5 :
-            return "Surprise"
-        else :
-            return "Neutral"
-
-    ### Altair Plot
-    df_altair = pd.read_csv('static/js/db/prob.csv', header=None, index_col=None).reset_index()
-    df_altair.columns = ['Time', 'Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
-
-    
-    angry = alt.Chart(df_altair).mark_line(color='orange', strokeWidth=2).encode(
-       x='Time:Q',
-       y='Angry:Q',
-       tooltip=["Angry"]
-    )
-
-    disgust = alt.Chart(df_altair).mark_line(color='red', strokeWidth=2).encode(
-        x='Time:Q',
-        y='Disgust:Q',
-        tooltip=["Disgust"])
-
-
-    fear = alt.Chart(df_altair).mark_line(color='green', strokeWidth=2).encode(
-        x='Time:Q',
-        y='Fear:Q',
-        tooltip=["Fear"])
-
-
-    happy = alt.Chart(df_altair).mark_line(color='blue', strokeWidth=2).encode(
-        x='Time:Q',
-        y='Happy:Q',
-        tooltip=["Happy"])
-
-
-    sad = alt.Chart(df_altair).mark_line(color='black', strokeWidth=2).encode(
-        x='Time:Q',
-        y='Sad:Q',
-        tooltip=["Sad"])
-
-
-    surprise = alt.Chart(df_altair).mark_line(color='pink', strokeWidth=2).encode(
-        x='Time:Q',
-        y='Surprise:Q',
-        tooltip=["Surprise"])
-
-
-    neutral = alt.Chart(df_altair).mark_line(color='brown', strokeWidth=2).encode(
-        x='Time:Q',
-        y='Neutral:Q',
-        tooltip=["Neutral"])
-
-
-    chart = (angry + disgust + fear + happy + sad + surprise + neutral).properties(
-    width=1000, height=400, title='Probability of each emotion over time')
-
-    chart.save('static/CSS/chart.html')
-    
-    return render_template('video_dash.html', emo=emotion_label(emotion), emo_other = emotion_label(emotion_other), prob = emo_prop(df_2), prob_other = emo_prop(df))
-
-# Audio Recording
-def audio_recording():
-
-    # Instanciate new SpeechEmotionRecognition object
-    SER = speechEmotionRecognition()
-
-    # Voice Recording
-    rec_duration = 16 # in sec
-    rec_sub_dir = os.path.join('tmp','voice_recording.wav')
-    SER.voice_recording(rec_sub_dir, duration=rec_duration)
-
-# Audio Emotion Analysis
-def audio_dash():
-
-    # Sub dir to speech emotion recognition model
-    model_sub_dir = os.path.join('Models', 'audio.hdf5')
-
-    # Instanciate new SpeechEmotionRecognition object
-    SER = speechEmotionRecognition(model_sub_dir)
-
-    # Voice Record sub dir
-    rec_sub_dir = os.path.join('tmp','voice_recording.wav')
-
-    # Predict emotion in voice at each time step
-    step = 1 # in sec
-    sample_rate = 16000 # in kHz
-    emotions, timestamp = SER.predict_emotion_from_file(rec_sub_dir, chunk_step=step*sample_rate)
-
-    # Export predicted emotions to .txt format
-    SER.prediction_to_csv(emotions, os.path.join("static/js/db", "audio_emotions.txt"), mode='w')
-    SER.prediction_to_csv(emotions, os.path.join("static/js/db", "audio_emotions_other.txt"), mode='a')
-
-    # Get most common emotion during the interview
-    major_emotion = max(set(emotions), key=emotions.count)
-
-    # Calculate emotion distribution
-    emotion_dist = [int(100 * emotions.count(emotion) / len(emotions)) for emotion in SER._emotion.values()]
-
-    # Export emotion distribution to .csv format for D3JS
-    df = pd.DataFrame(emotion_dist, index=SER._emotion.values(), columns=['VALUE']).rename_axis('EMOTION')
-    df.to_csv(os.path.join('static/js/db','audio_emotions_dist.txt'), sep=',')
-
-    # Sleep
-    time.sleep(0.5)#  ¿yo lo necesito?
-
-## En mi caso lo que necesito es sacar el texto del audio anterior
-
-global df_text
-
-tempdirectory = tempfile.gettempdir()
-
-# para entrevistas de trabajo puede estar bien, ¿puede servir a mi modelo que 
-# como parte de la predicción vayamos construyendo un modelo de personalidad 
-# según progresa la interacción?
-def get_personality(text):
-    try:
-        pred = predict().run(text, model_name = "Personality_traits_NN")
-        return pred
-    except KeyError:
-        return None
-
-def get_text_info(text):
-    text = text[0]
-    words = wordpunct_tokenize(text)
-    common_words = FreqDist(words).most_common(100)
-    counts = Counter(words)
-    num_words = len(text.split())
-    return common_words, num_words, counts
-
-def preprocess_text(text):
-    preprocessed_texts = NLTKPreprocessor().transform([text])
-    return preprocessed_texts
-
-
-def text_1():
-    
-    text = request.form.get('text')
-    traits = ['Extraversion', 'Neuroticism', 'Agreeableness', 'Conscientiousness', 'Openness']
-        # estas etiquetas son distintas a voz, ¿debería de estar alineado o son complementarios?
-        # ¿fusionar o dar información complementaria y diferente
-    probas = get_personality(text)[0].tolist()
-    
-    df_text = pd.read_csv('static/js/db/text.txt', sep=",")
-    df_new = df_text.append(pd.DataFrame([probas], columns=traits))
-    df_new.to_csv('static/js/db/text.txt', sep=",", index=False)
-    
-    perso = {}
-    perso['Extraversion'] = probas[0]
-    perso['Neuroticism'] = probas[1]
-    perso['Agreeableness'] = probas[2]
-    perso['Conscientiousness'] = probas[3]
-    perso['Openness'] = probas[4]
-    
-    df_text_perso = pd.DataFrame.from_dict(perso, orient='index')
-    df_text_perso = df_text_perso.reset_index()
-    df_text_perso.columns = ['Trait', 'Value']
-    
-    df_text_perso.to_csv('static/js/db/text_perso.txt', sep=',', index=False)
-    
-    means = {}
-    means['Extraversion'] = np.mean(df_new['Extraversion'])
-    means['Neuroticism'] = np.mean(df_new['Neuroticism'])
-    means['Agreeableness'] = np.mean(df_new['Agreeableness'])
-    means['Conscientiousness'] = np.mean(df_new['Conscientiousness'])
-    means['Openness'] = np.mean(df_new['Openness'])
-    
-    probas_others = [np.mean(df_new['Extraversion']), np.mean(df_new['Neuroticism']), np.mean(df_new['Agreeableness']), np.mean(df_new['Conscientiousness']), np.mean(df_new['Openness'])]
-    probas_others = [int(e*100) for e in probas_others]
-    
-    df_mean = pd.DataFrame.from_dict(means, orient='index')
-    df_mean = df_mean.reset_index()
-    df_mean.columns = ['Trait', 'Value']
-    
-    df_mean.to_csv('static/js/db/text_mean.txt', sep=',', index=False)
-    trait_others = df_mean.loc[df_mean['Value'].idxmax()]['Trait']
-    
-    probas = [int(e*100) for e in probas]
-    
-    data_traits = zip(traits, probas)
-    
-    session['probas'] = probas
-    session['text_info'] = {}
-    session['text_info']["common_words"] = []
-    session['text_info']["num_words"] = []
-    
-    preprocessed_text = preprocess_text(text)
-    common_words, num_words, counts = get_text_info(preprocessed_text)
-    
-    session['text_info']["common_words"].append(common_words)
-    session['text_info']["num_words"].append(num_words)
-    
-    trait = traits[probas.index(max(probas))]
-    
-    with open("static/js/db/words_perso.txt", "w") as d:
-        d.write("WORDS,FREQ" + '\n')
-        for line in counts :
-            d.write(line + "," + str(counts[line]) + '\n')
-        d.close()
-    
-    with open("static/js/db/words_common.txt", "a") as d:
-        for line in counts :
-            d.write(line + "," + str(counts[line]) + '\n')
-        d.close()
-
-    df_words_co = pd.read_csv('static/js/db/words_common.txt', sep=',', error_bad_lines=False)
-    df_words_co.FREQ = df_words_co.FREQ.apply(pd.to_numeric)
-    df_words_co = df_words_co.groupby('WORDS').sum().reset_index()
-    df_words_co.to_csv('static/js/db/words_common.txt', sep=",", index=False)
-    common_words_others = df_words_co.sort_values(by=['FREQ'], ascending=False)['WORDS'][:15]
-
-    df_words_perso = pd.read_csv('static/js/db/words_perso.txt', sep=',', error_bad_lines=False)
-    common_words_perso = df_words_perso.sort_values(by=['FREQ'], ascending=False)['WORDS'][:15]
-
-    return render_template('text_dash.html', traits = probas, trait = trait, trait_others = trait_others, probas_others = probas_others, num_words = num_words, common_words = common_words_perso, common_words_others=common_words_others)
-
-ALLOWED_EXTENSIONS = set(['pdf'])
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-def text_pdf():
-    f = request.files['file']
-    f.save(secure_filename(f.filename))
-    
-    text = parser.from_file(f.filename)['content']
-    traits = ['Extraversion', 'Neuroticism', 'Agreeableness', 'Conscientiousness', 'Openness']
-    probas = get_personality(text)[0].tolist()
-    
-    df_text = pd.read_csv('static/js/db/text.txt', sep=",")
-    df_new = df_text.append(pd.DataFrame([probas], columns=traits))
-    df_new.to_csv('static/js/db/text.txt', sep=",", index=False)
-    
-    perso = {}
-    perso['Extraversion'] = probas[0]
-    perso['Neuroticism'] = probas[1]
-    perso['Agreeableness'] = probas[2]
-    perso['Conscientiousness'] = probas[3]
-    perso['Openness'] = probas[4]
-    
-    df_text_perso = pd.DataFrame.from_dict(perso, orient='index')
-    df_text_perso = df_text_perso.reset_index()
-    df_text_perso.columns = ['Trait', 'Value']
-    
-    df_text_perso.to_csv('static/js/db/text_perso.txt', sep=',', index=False)
-    
-    means = {}
-    means['Extraversion'] = np.mean(df_new['Extraversion'])
-    means['Neuroticism'] = np.mean(df_new['Neuroticism'])
-    means['Agreeableness'] = np.mean(df_new['Agreeableness'])
-    means['Conscientiousness'] = np.mean(df_new['Conscientiousness'])
-    means['Openness'] = np.mean(df_new['Openness'])
-    
-    probas_others = [np.mean(df_new['Extraversion']), np.mean(df_new['Neuroticism']), np.mean(df_new['Agreeableness']), np.mean(df_new['Conscientiousness']), np.mean(df_new['Openness'])]
-    probas_others = [int(e*100) for e in probas_others]
-    
-    df_mean = pd.DataFrame.from_dict(means, orient='index')
-    df_mean = df_mean.reset_index()
-    df_mean.columns = ['Trait', 'Value']
-    
-    df_mean.to_csv('static/js/db/text_mean.txt', sep=',', index=False)
-    trait_others = df_mean.ix[df_mean['Value'].idxmax()]['Trait']
-    
-    probas = [int(e*100) for e in probas]
-    
-    data_traits = zip(traits, probas)
-    
-    session['probas'] = probas
-    session['text_info'] = {}
-    session['text_info']["common_words"] = []
-    session['text_info']["num_words"] = []
-    
-    preprocessed_text = preprocess_text(text)
-    common_words, num_words, counts = get_text_info(preprocessed_text)
-    
-    session['text_info']["common_words"].append(common_words)
-    session['text_info']["num_words"].append(num_words)
-    
-    trait = traits[probas.index(max(probas))]
-    
-    with open("static/js/db/words_perso.txt", "w") as d:
-        d.write("WORDS,FREQ" + '\n')
-        for line in counts :
-            d.write(line + "," + str(counts[line]) + '\n')
-        d.close()
-    
-    with open("static/js/db/words_common.txt", "a") as d:
-        for line in counts :
-            d.write(line + "," + str(counts[line]) + '\n')
-        d.close()
-
-    df_words_co = pd.read_csv('static/js/db/words_common.txt', sep=',', error_bad_lines=False)
-    df_words_co.FREQ = df_words_co.FREQ.apply(pd.to_numeric)
-    df_words_co = df_words_co.groupby('WORDS').sum().reset_index()
-    df_words_co.to_csv('static/js/db/words_common.txt', sep=",", index=False)
-    common_words_others = df_words_co.sort_values(by=['FREQ'], ascending=False)['WORDS'][:15]
-
-    df_words_perso = pd.read_csv('static/js/db/words_perso.txt', sep=',', error_bad_lines=False)
-    common_words_perso = df_words_perso.sort_values(by=['FREQ'], ascending=False)['WORDS'][:15]
-
-    return render_template('text_dash.html', traits = probas, trait = trait, trait_others = trait_others, probas_others = probas_others, num_words = num_words, common_words = common_words_perso, common_words_others=common_words_others)
 """
 Cuando tenga el GUI hecho, el control del flujo de la herramienta se llevará desde el GUI, por lo que habrá que lanzar el gui aquí
 
@@ -389,42 +95,136 @@ if __name__ == "__main__":
     print("Vamos a ello")
 
 
-import modeloVozTexto
+### Audio imports ###
+import pyAudioAnalysis
+from QE_audioUtils import QE_speaker_diarization, QE_assemble, QE_speech_Identify
+from QE_VoiceTextModel import QE_Voice_Text_Model
+#import wave  ¿?
 
-escucahdor = orejas.crear() # pendiente de resolver. Abrir un "escuchador" que va registrando el audio y generando "chunks" de audio que vamos procesando poco a poco en tiempo real según suceden
-modeloVT = modeloVozTexto.crear() # carga el modelo que tenemos entrenado. Es un volcado de los parámetros del modelo que hemos conseguido entrenar, tiene tanto la parte de speech como la de text
+#### INICIALIZAR CLASES ESPECÍFICAS DE LA APLICACIÓN
+VT_model = QE_Voice_Text_Model # carga el modelo que tenemos entrenado. 
+    #Es un volcado de los parámetros del modelo que hemos conseguido entrenar, tiene tanto la parte de speech como la de text
 
-interlocutores = [] # lista de identificadores de interlocutores, que son ternas (id_interlocutor, género interlocutor, rango edad interlocutor)
+
+ #### a ser posible transformar las listas siguientes en ARRAYS que será más rápido en CPU, creo   
+interlocutors = [] # lista de identificadores de interlocutores, que son ternas (id_interlocutor, género interlocutor, rango edad interlocutor)
+                        # aún no se lo que es un "id_interlocutor", tiene que permitir la identificación de interlocutores en el tiempo
+                            
 emociones = [] # lista ordenada de emociones asociadas a cada interlocutor en cada momento de la conversación, ternas (emoción, probabilidad, tiempo o id_palabra donde sucede)
-                # la emoción más reciente de cada interlocutor, la que está sucendiendo en el momento de hablar, está en un extremo de la lista (¿principio? ¿más antiguos hacia el final?)
-palabras = [] # palabras pronunciandose de cada interlocutor o corte de audio de palabra incompleta (aún no identificada) por interlocutor
+               # la emoción más reciente de cada interlocutor, la que está sucendiendo en el momento de hablar, está en un extremo de la lista (¿principio? 
+               # ¿más antiguos hacia el final?)
+#palabras = [] # palabras pronunciandose de cada interlocutor o corte de audio de palabra incompleta (aún no identificada) por interlocutor
+        #ya no, ahora tanto lo identificado como lo pendiente est´en current Ones, pero hay un índice de por donde va en cada interlocutor
 mensajes = [] # lista de mensajes de cada uno de los interlocutores
                 # un mensaje es una lista ordenada de pares (texto palabra, audio palabra)
+current_ones = [] # estructura con los canales de audio a medida que se van registrando, uno por cada interlocutor. 
+                  # son duplas  (    audio,  recognized_index,   interlocutor(id_interlocutor, género interlocutor, rango edad interlocutor)      )
+                        # recognized_index, is the point of audio to which the words already have been identified, and the point from 
+                        # recognition must continue
+
+# pyAudioAnalysis diarization models
+# In order to avoid a recurrent load of the models, they are loaded more globally, here, only once and then also passed as arguments
+# to the pyAudioAnalysis functions
+# ¿transformar esto en una clase y crear un objeto que luego haga las cosas sin perder el modelo?
+# Se podría llamar QE_diarization_model
+base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 
+                            "data/models")#copiado en el sitio correspondiente, creo
+    classifier_all, mean_all, std_all, class_names_all, _, _, _, _, _ = \
+        at.load_model_knn(os.path.join(base_dir, "knn_speaker_10"))
+    classifier_fm, mean_fm, std_fm, class_names_fm, _, _, _, _,  _ = \
+        at.load_model_knn(os.path.join(base_dir, "knn_speaker_male_female"))
 
 
-with escuchador.open() as esc:
-    for corte in esc.sonido_in :
-        actuales = audioX.diarization(corte) # separa los interlocutores, devuelve una lista de audios separadas por cada interlocutor, en forma
-                # de  duplass (    audio,    interlocutor(id_interlocutor, género interlocutor, rango edad interlocutor)      )
-        interlocutores = audioX.incorporar(actuales) #
-        palabras, mensajes, flag_nuevo = audioX.pegar(palabras, actuales) # incorpora audios en "actuales" por cada interlocutor a las palabras incompletas, intenta reconocerlas, 
-                # y si lo consigue, añade a "mensajes" las nuevas palabras en cada interlocutor y devuelve flag_nuevo=true, y además elimina de "palabras" los segmentos de audio que han sido identificados
-        if flag_nuevo
-            modeloVT.evaluar_emociones(mensajes) # intenta reconocer la emoción que hay en el par (texto palabra, audio palabra) nuevo que hay en los diferentes mensajes,  con una probabilidad. 
-                # Tambíen revisa las palabras anteriores con las nuevas, en cada mensaje, para ver si puede modificar la emoción anterior con una mejor probabilidad gracias a la nueva palabra
-                # ¿evaluar palabra a palabra? ¿en pares, ternas....?
-        
-        visualizarEmociones(mensajes) # visualiza, por una parte la emoción actual de cada interlocutor con la probabilidad o certidumbre del modelo y
-                # por otra parte la secuendia de emociones, con sus probabilidades, por las que ha ido pasando de más nueva a más antigua.
-                # Se mostrará en la forma en que se decida, por GUI o como sea...
+# INICIALIZAR "ESCUCHADOR" DE AUDIO
+CHUNK = 88200 # Number of data points to read at a time, Initially 4096 SAMPLES, lets see wether 88200 =>  2 seconds is possible
+RATE = 44100  # time resolution of the recording device (Hz), RECORD AT 44100 SAMPLES PER SECOND
 
-        if evento_final == true
+# Abrir un "escuchador" que va registrando el audio y generando "chunks" o cortes de audio que
+# vamos procesando poco a poco en tiempo real según suceden
+p=pyaudio.PyAudio() # start the PyAudio class. 
+print('Recording')
+
+stream=p.open(format=pyaudio.paInt16,
+                channels=1, #ya capturamos en mono
+                rate=RATE,
+                input=True,
+                frames_per_buffer=CHUNK) #uses default input device
+
+while 1 : # Infinite listening loop , en realidad vendrá determinado por el loop del GUI
+    corte = stream.read(chunk)  #corte = data, data = corte
+     
+    interlocutors_labels = QE_speaker_diarization(sampling_rate = RATE, signal = corte , numSpeakers=1, mid_window=0.4, mid_step=0.05, # defaults are mid_window=2.0  and mid_step=0.2
+                        classifier_all, mean_all, std_all, class_names_all, classifier_fm, mean_fm, std_fm, class_names_fm # Load models from avove
+                        short_window=0.05, lda_dim=0, plot_res=False):   # separa los interlocutores, 
+                        # y lo que devuelve es un ID del speaker de cada subsegmento, para cada window o step le asigna un label de speaker
+                        """
+                            mid_window creo que son segundos
+                            mid_step creo que son segundos
+                            si corte durase 2 segunos, se podrían hacer 33 ventanas solapadas  de 400ms con saltos de 50ms
+                        """
+                        # ¿y que quería yo? una lista de audios separadas por cada interlocutor, en forma
+                         # de  duplas (    audio,    interlocutor(id_interlocutor, género interlocutor, rango edad interlocutor)      )
+                         # ¿tengo que pasar todas las veces todo el audio hsata el momento?¿como mantengo la identificación de interlocutores a lo largo del tiempo?
+    current_ones = QE_assemble(interlocutors_labels, corte) #. "fusiona" o concatena los cortes de cada interlocutor para ir construyendo cada canal. # faltaría el género y la edad
+                    # problema, ¿como mantener la choerencia de los interlocutores identificados a lo largo del tiempo y de las sucesivas llamadas a diarization
+                    # ¿tal vez una clase que vaya registrando las características , mfcc , y tal de los cortes que se van evaluando, ¿generar un hash o algo así de los 
+                    # clusters?¿distancia a los centroides?¿pasar los centroides como argumento y recalcularlos a medida que se llama a diarization pero incorporando la info anteior?
+                    # De momento asumir que está resuelto y si esto se complica mucho, fuerzo a que haya dos canales de alguna forma.
+    mensajes, flag_nuevo, current_ones = QE_speech_Identify(mensajes, current_ones)  #¿se chace una copia de current_Ones? no debería de hacerse, hay 
+    #que trabajar sobre el mismo array en memoria, ver como pasar los argumentos para que sea así, o usando en su lugar una clase que mantiene el objeto, o jugando con punteros.
+            # Para cada interlocutor intenta identificar nuevas palabras mapeándolas con su segmento de audio correspondiente
+            # las palabras incompletas; intenta reconocerlas, y si lo consigue, añade a "mensajes" las nuevas palabras en cada interlocutor y 
+            # devuelve flag_nuevo=true, y además modifica los INDEX de current_ones
+    if flag_nuevo:
+        emociones = VT_model.evaluate(mensajes) # intenta reconocer la emoción que hay en el par (texto palabra, audio palabra) nuevo que hay en 
+            # los diferentes mensajes,  con una probabilidad. 
+            # Tambíen revisa las palabras anteriores con las nuevas, en cada mensaje, para ver si puede modificar la emoción anterior con una 
+            # mejor probabilidad gracias a la nueva palabra  # ¿evaluar palabra a palabra? ¿en pares, ternas....?
+    
+    visualizar_emociones(emociones, mensajes) # visualiza, por una parte la emoción actual de cada interlocutor con la probabilidad o certidumbre del modelo y
+            # por otra parte la secuencia de emociones, con sus probabilidades, por las que ha ido pasando de más nueva a más antigua.
+            # Se mostrará en la forma en que se decida, por GUI o como sea...
+
+    if evento_final == true: # esto en realidad vendrá determinado por el GUI         
         d.close()
    
+
+# timeit.timeit(while_loop) 
+# ¿?no tiene mucho sentido medir la duración del bucle dado que será el tiempo real que tengo la aplicación activa. Lo que habría que medir es el tiempo que tarda el bucle en dar el salto atrás
+
+# Cerramos el escuchador
+stream.stop_stream()
+stream.close()
+p.terminate()
+
+print('Finished recording')
+
+# Save the recorded data as a WAV file
+wf = wave.open(filename, 'wb')
+wf.setnchannels(channels)
+wf.setsampwidth(p.get_sample_size(sample_format))
+wf.setframerate(fs)
+wf.writeframes(b''.join(frames))
+wf.close()
+
+
+
  ####################################################################################
  #                                                                                  # 
  #   ¿  Y   QUE     PROBLEMA    RESUELVE    ESTO    ?                               #
  #   vender la moto bien bien                                                       #
  #                                                                                  # 
  ####################################################################################
-    
+
+"""
+from goto import with_goto
+@with_goto  # Decorador necesario.
+def f():
+    label .get_input  # Definir porción del código.
+    age = raw_input("Edad: ")
+    try:
+        age = int(age)
+    except ValueError:
+        goto .get_input  # Regresar a get_input.
+f()
+"""
